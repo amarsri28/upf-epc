@@ -1,15 +1,59 @@
-From 460ac23d8143f8475a7819aa8ccbbf930f2940c8 Mon Sep 17 00:00:00 2001
-From: Amar Srivastava <amarsri28@gmail.com>
-Date: Wed, 23 Dec 2020 02:33:49 -0800
-Subject: [PATCH] dpdk-hash linking and pipeline improvements
+From 3a29f6b5fd81c4f5517a955e37aa77ad76f3912f Mon Sep 17 00:00:00 2001
+From: Amar Sri <amarsri28@gmail.com>
+Date: Tue, 9 Mar 2021 02:16:36 -0800
+Subject: [PATCH] Exact Match Bulk support
 
 ---
+ core/modules/exact_match.cc    |  25 ++--
  core/modules/wildcard_match.cc | 202 ++++++++++++++++++++++++++-------
  core/modules/wildcard_match.h  |  37 ++++--
  core/utils/cuckoo_map.h        | 146 +++++++++++++++++++++++-
- core/utils/exact_match_table.h |  97 +++++++++++-----
- 4 files changed, 403 insertions(+), 79 deletions(-)
+ core/utils/exact_match_table.h |  92 ++++++++++-----
+ 5 files changed, 407 insertions(+), 95 deletions(-)
 
+diff --git a/core/modules/exact_match.cc b/core/modules/exact_match.cc
+index 1ca0fd4e..5313feea 100644
+--- a/core/modules/exact_match.cc
++++ b/core/modules/exact_match.cc
+@@ -312,7 +312,6 @@ void ExactMatch::setValues(bess::Packet *pkt, ExactMatchKey &action) {
+ void ExactMatch::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
+   gate_idx_t default_gate;
+   ExactMatchKey keys[bess::PacketBatch::kMaxBurst] __ymm_aligned;
+-
+   default_gate = ACCESS_ONCE(default_gate_);
+ 
+   const auto buffer_fn = [&](bess::Packet *pkt, const ExactMatchField &f) {
+@@ -326,18 +325,18 @@ void ExactMatch::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
+ 
+   int cnt = batch->cnt();
+   Value default_value(default_gate);
+-
+-  for (int i = 0; i < cnt; i++) {
+-    bess::Packet *pkt = batch->pkts()[i];
+-    ValueTuple res;
+-    res = table_.Find(keys[i], default_value);
+-    if (res.gate != default_gate) {
+-      /* setting respecive values */
+-      setValues(pkt, res.action);
+-    }
+-    gate_idx_t g = res.gate;
+-    EmitPacket(ctx, pkt, g);
+-  }
++  ValueTuple *res[cnt]; 
++  uint64_t hit_mask = table_.Find(&keys[0],&res[0],cnt);
++  for(int j=0;j<cnt;j++)
++    {
++		  if ((hit_mask & (1ULL << j))  == 0) 
++        EmitPacket(ctx, batch->pkts()[j],default_gate);
++      else
++      {
++	      setValues(batch->pkts()[j], res[j]->action);
++        EmitPacket(ctx, batch->pkts()[j], res[j]->gate);
++      }
++   }
+ }
+ 
+ std::string ExactMatch::GetDesc() const {
 diff --git a/core/modules/wildcard_match.cc b/core/modules/wildcard_match.cc
 index ec639a7b..ade76975 100644
 --- a/core/modules/wildcard_match.cc
@@ -340,7 +384,7 @@ index ec639a7b..ade76975 100644
        rule_t *rule = resp.add_rules();
        rule->set_priority(entry.second.priority);
 diff --git a/core/modules/wildcard_match.h b/core/modules/wildcard_match.h
-index 85deeafc..a76cec4c 100644
+index 85deeafc..7ca611e9 100644
 --- a/core/modules/wildcard_match.h
 +++ b/core/modules/wildcard_match.h
 @@ -45,6 +45,7 @@ using bess::utils::HashResult;
@@ -661,7 +705,7 @@ index c855b93d..1d83d8c0 100644
    // Tunable macros
    static const int kInitNumBucket = 4;
 diff --git a/core/utils/exact_match_table.h b/core/utils/exact_match_table.h
-index 7c0cfda4..28301580 100644
+index 7c0cfda4..14cd8ac3 100644
 --- a/core/utils/exact_match_table.h
 +++ b/core/utils/exact_match_table.h
 @@ -155,15 +155,37 @@ typedef std::vector<std::vector<uint8_t>> ExactMatchRuleFields;
@@ -749,7 +793,7 @@ index 7c0cfda4..28301580 100644
  
    // Extract an ExactMatchKey from `buf` based on the fields that have been
    // added to this table.
-@@ -272,9 +295,16 @@ class ExactMatchTable {
+@@ -272,23 +295,32 @@ class ExactMatchTable {
    // Returns the value if `key` matches a rule, otherwise `default_value`.
    T Find(const ExactMatchKey &key, const T &default_value) const {
      const auto &table = table_;
@@ -769,37 +813,31 @@ index 7c0cfda4..28301580 100644
    }
  
    // Find entries for `n` `keys` in the table and store their values in in
-@@ -283,11 +313,24 @@ class ExactMatchTable {
-   void Find(const ExactMatchKey *keys, T *vals, size_t n,
-             T default_value) const {
+   // `vals`.  Keys without entries will have their corresponding entires in
+   // `vals` set to `default_value`.
+-  void Find(const ExactMatchKey *keys, T *vals, size_t n,
+-            T default_value) const {
++  uint64_t Find(ExactMatchKey *keys, T **vals, int n) {
      const auto &table = table_;
 -    for (size_t i = 0; i < n; i++) {
 -      const auto *entry =
 -          table.Find(keys[i], ExactMatchKeyHash(total_key_size_),
 -                     ExactMatchKeyEq(total_key_size_));
 -      vals[i] = entry ? entry->second : default_value;
-+    uint64_t *hit_mask;
-+    int num =0;
-+    for (size_t i = 0; i < n; i=i+32) 
-+    {
-+      num= (n-i >= 32) ?32:n-i;
-+      for(int h=0;h<num;h++)
-+        {
-+          Initkeys(&keys[h]);
-+        }
-+      void* k = &keys[i];
-+      int ans = table.Lookup_Bulk_data(&k,num, hit_mask, &vals[i]);
-+      if(ans != num)
-+        {
-+          for (int k = 0; k < num; k++) {
-+					  if ((*hit_mask & (1ULL << k))  == 0) 
-+          	  vals[k]= default_value;
-+					  }
-+        }
-     }
+-    }
++    uint64_t hit_mask=0;
++    ExactMatchKey *key_ptr[n];
++    for(int h=0;h<n;h++)
++     {
++      key_ptr[h] = &keys[h];
++      Initkeys(&keys[h]);
++     }
++    table->lookup_bulk_data((const void**)&key_ptr,n, &hit_mask, (void**)&vals[0]);
++    return hit_mask;
    }
  
-@@ -318,9 +361,9 @@ class ExactMatchTable {
+   uint32_t total_key_size() const { return total_key_size_; }
+@@ -318,9 +350,9 @@ class ExactMatchTable {
    // Returns the ith field.
    const ExactMatchField &get_field(size_t i) const { return fields_[i]; }
  
@@ -811,7 +849,7 @@ index 7c0cfda4..28301580 100644
  
   private:
    Error MakeError(int code, const std::string &msg = "") {
-@@ -447,12 +490,10 @@ class ExactMatchTable {
+@@ -447,12 +479,10 @@ class ExactMatchTable {
  
    // aligned total key size
    size_t total_key_size_;
@@ -827,3 +865,5 @@ index 7c0cfda4..28301580 100644
  }  // namespace bess
  }  // namespace utils
 -- 
+2.25.1
+
