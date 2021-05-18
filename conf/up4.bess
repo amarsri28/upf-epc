@@ -27,6 +27,7 @@ farBufferAction = 3
 farNotifyCPAction = 4
 pdrFailGate = 2
 farFailGate = 2
+qerFailGate = 1
 interfaces = ["access", "core"]
 parser = Parser('conf/upf.json')
 parser.parse(interfaces)
@@ -192,7 +193,14 @@ if ntf:
   _in -> ntf
   _in = ntf
 
-_in -> farLookup::ExactMatch(fields=[{'attr_name':'far_id', 'num_bytes':4}, \
+#with dummy params for testing/viewing pipeline now till we get exact params from pfcp
+_in -> qerLookup::Qos(fields=[{'attr_name':'id', 'num_bytes':4}, \
+                                     {'attr_name':'seid', 'num_bytes':4}], \
+                             values=[{'attr_name':'params', 'num_bytes':1}, \
+                                     {'attr_name':'cir', 'num_bytes':2}]):noGTPUEncap \
+
+_in1 = qerLookup
+_in1 -> farLookup::ExactMatch(fields=[{'attr_name':'far_id', 'num_bytes':4}, \
                                      {'attr_name':'fseid', 'num_bytes':4}], \
                              values=[{'attr_name':'action', 'num_bytes':1}, \
                                      {'attr_name':'tunnel_out_type', 'num_bytes':1}, \
@@ -219,6 +227,7 @@ farLookup:GTPUEncap \
 pktParse:0 -> badPkts::Sink()
 pdrLookup:pdrFailGate -> pdrLookupFail::Sink()
 farLookup:farFailGate -> farLookupFail::Sink()
+qerLookup:qerFailGate -> qerLookupFail::Sink()
 executeFAR:farDropAction -> farDrop::Sink()
 executeFAR:farNotifyCPAction -> farNotifyCP::Sink()
 executeFAR:farBufferAction -> farBuffer::Sink()
@@ -227,6 +236,7 @@ gtpuEncap:0 -> gtpuEncapFail::Sink()
 # Set default gates for relevant modules
 pdrLookup.set_default_gate(gate=pdrFailGate)
 farLookup.set_default_gate(gate=farFailGate)
+qerLookup.set_default_gate(gate=qerFailGate)
 
 
 # ====================================================
