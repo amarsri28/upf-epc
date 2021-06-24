@@ -51,6 +51,15 @@ static_assert(MAX_FIELD_SIZE <= sizeof(uint64_t),
 #if __BYTE_ORDER__ != __ORDER_LITTLE_ENDIAN__
 #error this code assumes little endian architecture (x86)
 #endif
+/*
+struct QosKey {
+  uint64_t u64_arr[MAX_FIELDS];
+};
+*/
+struct QosData {
+  gate_idx_t ogate;
+  int mbr;
+};
 
 class Qos final : public Module {
  public:
@@ -69,6 +78,11 @@ class Qos final : public Module {
   CommandResponse CommandClear(const bess::pb::EmptyArg &arg);
   CommandResponse CommandSetDefaultGate(
       const bess::pb::QosCommandSetDefaultGateArg &arg);
+        template <typename T>
+CommandResponse ExtractKeyMask(const T &arg, MeteringKey *key,
+                                              QosData *val) ;
+                                              template <typename T>
+CommandResponse ExtractKey(const T &arg, MeteringKey *key) ;
   struct rte_meter_srtcm m;
   struct rte_meter_srtcm_profile p;
 
@@ -76,8 +90,9 @@ class Qos final : public Module {
   gate_idx_t LookupEntry(const MeteringKey &key, gate_idx_t def_gate);
   CommandResponse AddFieldOne(const bess::pb::Field &field,
                               struct MeteringField *f);
-  template <typename T>
-  CommandResponse ExtractKey(const T &arg, MeteringKey *key);
+  //template <typename T>
+  //CommandResponse ExtractKey(const T &arg, MeteringKey *key);
+
   int DelEntry(MeteringKey *key);
   int GetEntryCount();
   void Clear();
@@ -85,7 +100,7 @@ class Qos final : public Module {
   size_t total_key_size_; /* a multiple of sizeof(uint64_t) */
 
   std::vector<struct MeteringField> fields_;
-  Metering<int> table_;
+  Metering<QosData> table_;
 };
 
 #endif  // BESS_MODULES_QOS_H

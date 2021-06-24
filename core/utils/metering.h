@@ -135,23 +135,21 @@ class Metering {
 
   Error Add(const T &val, const MeteringKey &key) {
     Error err;
-#ifdef debug
     const void *Key_t = (const void *)&key;
     T *val_t = new T(val);
     table_->insert_dpdk(Key_t, val_t);
-#endif
+
     return MakeError(0);
   }
 
   Error Delete(const MeteringKey &key) {
-#ifdef debug
     Error err;
     bool ret = table_->Remove(key, MeteringKeyHash(total_key_size_),
                               MeteringKeyEq(total_key_size_));
     if (!ret) {
       return MakeError(ENOENT, "rule doesn't exist");
     }
-#endif
+
     return MakeError(0);
   }
 
