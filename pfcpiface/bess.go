@@ -494,6 +494,11 @@ func (b *bess) sim(u *upf, method string) {
 			qfi:      9,
 			ulStatus: 0,
 			dlStatus: 0,
+			cir:      50000,
+			pir:      50000,
+			cbs:      2048,
+			pbs:      2048,
+			ebs:      2048,
 			ulMbr:    50000,
 			dlMbr:    50000,
 			ulGbr:    50000,
@@ -506,6 +511,11 @@ func (b *bess) sim(u *upf, method string) {
 			qfi:      8,
 			ulStatus: 0,
 			dlStatus: 0,
+			cir:      50000,
+			pir:      50000,
+			cbs:      2048,
+			pbs:      2048,
+			ebs:      2048,
 			ulMbr:    50000,
 			dlMbr:    50000,
 			ulGbr:    50000,
@@ -518,6 +528,11 @@ func (b *bess) sim(u *upf, method string) {
 			qfi:      7,
 			ulStatus: 0,
 			dlStatus: 0,
+			cir:      50000,
+			pir:      50000,
+			cbs:      2048,
+			pbs:      2048,
+			ebs:      2048,
 			ulMbr:    50000,
 			dlMbr:    50000,
 			ulGbr:    50000,
@@ -660,7 +675,7 @@ func (b *bess) addQER(ctx context.Context, done chan<- bool, qer qer) {
 	go func() {
 		var any *anypb.Any
 		var err error
-		q := &pb.ExactMatchCommandAddArg{
+		q := &pb.QosCommandAddArg{
 			Gate: uint64(0),
 			Fields: []*pb.FieldData{
 				intEnc(uint64(qer.qerID)), /* far_id */
@@ -670,6 +685,11 @@ func (b *bess) addQER(ctx context.Context, done chan<- bool, qer qer) {
 				intEnc(uint64(qer.qfi)),      /* action */
 				intEnc(uint64(qer.ulStatus)), /* QFI */
 				intEnc(uint64(qer.dlStatus)), /* tunnel_out_type */
+				intEnc(uint64(qer.cir)),      /* committed info rate */
+				intEnc(uint64(qer.pir)),      /* Peak Info rate */
+				intEnc(uint64(qer.cbs)),      /* committed burst size */
+				intEnc(uint64(qer.pbs)),      /* Peak burst size */
+				intEnc(uint64(qer.ebs)),      /* Excess burst size */
 				intEnc(uint64(qer.ulMbr)),    /* access-ip */
 				intEnc(uint64(qer.dlMbr)),    /* enb ip */
 				intEnc(uint64(qer.ulGbr)),    /* enb teid */
@@ -691,7 +711,7 @@ func (b *bess) delQER(ctx context.Context, done chan<- bool, qer qer) {
 		var any *anypb.Any
 		var err error
 
-		q := &pb.ExactMatchCommandDeleteArg{
+		q := &pb.QosCommandDeleteArg{
 			Fields: []*pb.FieldData{
 				intEnc(uint64(qer.qerID)), /* qer_id */
 				intEnc(uint64(qer.fseID)), /* fseid */

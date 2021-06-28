@@ -130,6 +130,7 @@ RUN mkdir /bess_pb && \
 FROM golang AS pfcpiface-build
 WORKDIR /pfcpiface
 COPY pfcpiface .
+COPY --from=go-pb /bess_pb ./bess_pb
 RUN CGO_ENABLED=0 go build -mod=vendor -o /bin/pfcpiface
 
 # Stage pfcpiface: runtime image of pfcpiface toward SMF/SPGW-C

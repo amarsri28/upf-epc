@@ -14,6 +14,11 @@ type qer struct {
 	qfi      uint8
 	ulStatus uint8
 	dlStatus uint8
+	cir      uint64
+	pir      uint64
+	cbs      uint64
+	ebs      uint64
+	pbs      uint64
 	ulMbr    uint64
 	dlMbr    uint64
 	ulGbr    uint64
@@ -34,6 +39,11 @@ func (q *qer) printQER() {
 	log.Println("Downlink MBR:", q.dlMbr)
 	log.Println("Uplink GBR:", q.ulGbr)
 	log.Println("Downlink GBR:", q.dlGbr)
+	log.Println("Committed Information rate:", q.cir)
+	log.Println("Peak Information rate:", q.pir)
+	log.Println("Committed burst size:", q.cbs)
+	log.Println("Peak burst size:", q.pbs)
+	log.Println("Excess burst size:", q.pbs)
 	log.Println("--------------------------------------------")
 }
 func (q *qer) parseQER(ie1 *ie.IE, seid uint64, upf *upf) error {
@@ -87,6 +97,11 @@ func (q *qer) parseQER(ie1 *ie.IE, seid uint64, upf *upf) error {
 	q.dlMbr = uint64(mbrDL)
 	q.ulGbr = uint64(gbrUL)
 	q.dlGbr = uint64(gbrDL)
+	q.cir = q.dlMbr
+	q.pir = q.dlMbr
+	q.cbs = 2048
+	q.pbs = 2048
+	q.ebs = 2048
 	q.fseID = (seid) // fseID currently being truncated to uint32 <--- FIXIT/TODO/XXX
 
 	return nil
