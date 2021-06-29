@@ -57,7 +57,6 @@ struct QosKey {
 };
 */
 struct QosData {
-  gate_idx_t ogate;
   uint8_t qfi;
   uint8_t ulStatus;
   uint8_t dlStatus;
@@ -70,7 +69,8 @@ struct QosData {
   uint32_t dlMbr;
   uint32_t ulGbr;
   uint32_t dlGbr;
-};
+  gate_idx_t ogate;
+}__attribute__((packed));
 
 class Qos final : public Module {
  public:
@@ -109,8 +109,9 @@ CommandResponse ExtractKey(const T &arg, MeteringKey *key) ;
   void Clear();
   gate_idx_t default_gate_;
   size_t total_key_size_; /* a multiple of sizeof(uint64_t) */
-
+  size_t total_value_size_;
   std::vector<struct MeteringField> fields_;
+  std::vector<struct MeteringField> values_;
   Metering<QosData> table_;
 };
 

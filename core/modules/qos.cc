@@ -79,6 +79,8 @@ CommandResponse Qos::AddFieldOne(const bess::pb::Field &field,
 
 CommandResponse Qos::Init(const bess::pb::QosArg &arg) {
   int size_acc = 0;
+  int value_acc=0;
+ std::cout<<"Qos::Init called"<<std::endl;
 
   for (int i = 0; i < arg.fields_size(); i++) {
     const auto &field = arg.fields(i);
@@ -93,8 +95,25 @@ CommandResponse Qos::Init(const bess::pb::QosArg &arg) {
 
     size_acc += f.size;
   }
+  
+for (int i = 0; i < arg.values_size(); i++) {
+    const auto &field = arg.values(i);
+    CommandResponse err;
+    values_.emplace_back();
+    struct MeteringField &f = values_.back();
+    f.pos = value_acc;
+    err = AddFieldOne(field, &f);
+    if (err.error().code() != 0) {
+      return err;
+    }
+
+    value_acc += f.size;
+  }
+
   default_gate_ = DROP_GATE;
   total_key_size_ = align_ceil(size_acc, sizeof(uint64_t));
+  total_value_size_ = align_ceil(value_acc, sizeof(uint64_t));
+
   table_.Init(total_key_size_);
 #ifdef metering_test
   struct rte_meter_srtcm_params app_srtcm_params = {
@@ -114,7 +133,7 @@ void Qos::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
   gate_idx_t default_gate;
   default_gate = ACCESS_ONCE(default_gate_);
   int cnt = batch->cnt();
-
+ // std::cout<<"ProcessBatch called"<<std::endl;
   for (int j = 0; j < cnt; j++) {
 #ifdef metering_test
     uint64_t time = rte_rdtsc();
@@ -209,28 +228,54 @@ CommandResponse Qos::ExtractKey(const T &arg, MeteringKey *key) {
 template <typename T>
 CommandResponse Qos::ExtractKeyMask(const T &arg, MeteringKey *key,
                                               QosData *val) {
-  if ((size_t)arg.values_size() != fields_.size()) {
-    return CommandFailure(EINVAL, "must specify %zu values", fields_.size());
-  } else if ((size_t)arg.fields_size() != fields_.size()) {
+  
+  if ((size_t)arg.fields_size() != fields_.size()) {
     return CommandFailure(EINVAL, "must specify %zu masks", fields_.size());
   }
 
   memset(key, 0, sizeof(*key));
   memset(val, 0, sizeof(*val));
-
+  
   for (size_t i = 0; i < fields_.size(); i++) {
     int field_size = fields_[i].size;
     int field_pos = fields_[i].pos;
 
+    //uint64_t v = 0;
+    uint64_t k = 0;
+
+    bess::pb::FieldData fieldsdata = arg.fields(i);
+    if (fieldsdata.encoding_case() == bess::pb::FieldData::kValueInt) {
+      if (!bess::utils::uint64_to_bin(&k, fieldsdata.value_int(), field_size,
+                                      true)) {
+        return CommandFailure(EINVAL, "idx %zu: not a correct %d-byte mask", i,
+                              field_size);
+      }
+    } else if (fieldsdata.encoding_case() == bess::pb::FieldData::kValueBin) {
+      bess::utils::Copy(reinterpret_cast<uint8_t *>(&k),
+                        fieldsdata.value_bin().c_str(),
+                        fieldsdata.value_bin().size());
+    }
+        
+   
+    memcpy(reinterpret_cast<uint8_t *>(key) + field_pos, &k, field_size);
+   }
+
+    
+   for (size_t i = 0; i < values_.size(); i++) {
+
+    // arg.values(i);
+    int val_size = values_[i].size;
+    int val_pos = values_[i].pos;
+
     uint64_t v = 0;
-    uint64_t m = 0;
+    //uint64_t m = 0;
 
     bess::pb::FieldData valuedata = arg.values(i);
-    if (valuedata.encoding_case() == bess::pb::FieldData::kValueInt) {
-      if (!bess::utils::uint64_to_bin(&v, valuedata.value_int(), field_size,
-                                      true)) {
+    if (valuedata.encoding_case() == bess::pb::FieldData::kValueInt) { 
+      if (!bess::utils::uint64_to_bin(&v, valuedata.value_int(), val_size,
+                                      false)) {
         return CommandFailure(EINVAL, "idx %zu: not a correct %d-byte value", i,
-                              field_size);
+                              val_size);
       }
     } else if (valuedata.encoding_case() == bess::pb::FieldData::kValueBin) {
       bess::utils::Copy(reinterpret_cast<uint8_t *>(&v),
@@ -238,34 +283,12 @@ CommandResponse Qos::ExtractKeyMask(const T &arg, MeteringKey *key,
                         valuedata.value_bin().size());
     }
 
-    bess::pb::FieldData fieldsdata = arg.fields(i);
-    if (fieldsdata.encoding_case() == bess::pb::FieldData::kValueInt) {
-      if (!bess::utils::uint64_to_bin(&m, fieldsdata.value_int(), field_size,
-                                      true)) {
-        return CommandFailure(EINVAL, "idx %zu: not a correct %d-byte mask", i,
-                              field_size);
-      }
-    } else if (fieldsdata.encoding_case() == bess::pb::FieldData::kValueBin) {
-      bess::utils::Copy(reinterpret_cast<uint8_t *>(&m),
-                        fieldsdata.value_bin().c_str(),
-                        fieldsdata.value_bin().size());
-    }
-
-    if (v & ~m) {
-      return CommandFailure(EINVAL,
-                            "idx %zu: invalid pair of "
-                            "value 0x%0*" PRIx64
-                            " and "
-                            "mask 0x%0*" PRIx64,
-                            i, field_size * 2, v, field_size * 2, m);
-    }
-
-    // Use memcpy, not utils::Copy, to workaround the false positive warning
-    // in g++-8
-    memcpy(reinterpret_cast<uint8_t *>(key) + field_pos, &v, field_size);
-    memcpy(reinterpret_cast<uint8_t *>(val) + field_pos, &m, field_size);
-  }
-
+    
+      
+    memcpy(reinterpret_cast<uint8_t *>(val) + val_pos, &v, val_size);
+    
+  
+   }
   return CommandSuccess();
 }
 
@@ -274,16 +297,15 @@ CommandResponse Qos::CommandAdd(const bess::pb::QosCommandAddArg &arg) {
   // to be done extract key & value..
   // table_.Add(const T &val, const MeteringKey &key)
 gate_idx_t gate = arg.gate();
-  
-  MeteringKey key ;//= {0};
-  QosData val ;//= {0};
+  std::cout<<"CommandAdd"<<std::endl;
+  MeteringKey key ;
+ 
 
   struct QosData data;
-  
-    CommandResponse err =ExtractKeyMask(arg, &key,&val);
-
- // CommandResponse err = ExtractKeyMask(arg, &key, &mask);
-  if (err.error().code() != 0) {
+  data.ogate = gate;
+    CommandResponse err =ExtractKeyMask(arg, &key,&data);
+    
+   if (err.error().code() != 0) {
     return err;
   }
 

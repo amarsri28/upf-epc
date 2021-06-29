@@ -72,7 +72,7 @@ using Error = std::pair<int, std::string>;
 
 struct MeteringKey {
   uint64_t u64_arr[MAX_FIELDS];
-};
+}__attribute__((packed));
 
 // Equality operator for two MeteringKeys
 class MeteringKeyEq {
@@ -137,8 +137,7 @@ class Metering {
     Error err;
     const void *Key_t = (const void *)&key;
     T *val_t = new T(val);
-    table_->insert_dpdk(Key_t, val_t);
-
+    int t = table_->insert_dpdk(Key_t, val_t);std::cout<<"Insert="<<t<<std::endl;
     return MakeError(0);
   }
 
