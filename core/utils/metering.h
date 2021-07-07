@@ -137,7 +137,8 @@ class Metering {
     Error err;
     const void *Key_t = (const void *)&key;
     T *val_t = new T(val);
-    int t = table_->insert_dpdk(Key_t, val_t);std::cout<<"Insert="<<t<<std::endl;
+   // std::cout<<"Metering Key0="<<key.u64_arr[0]<<" 1="<<key.u64_arr[1]<<" 2="<<key.u64_arr[2]<<" 3="<<key.u64_arr[3]<<" 4="<<key.u64_arr[4]<<" 5= "<<key.u64_arr[5]<<" 6="<<key.u64_arr[6]<<" 7="<<key.u64_arr[7]<<std::endl;
+    int t = table_->insert_dpdk(Key_t, val_t); std::cout<<t<<std::endl;
     return MakeError(0);
   }
 
@@ -158,7 +159,7 @@ class Metering {
   // Find an entry in the table.
   // Returns the value if `key` matches a rule, otherwise `default_value`.
   T Find(const MeteringKey &key, const T &default_value) const {
-#ifdef debug
+
     const auto &table = table_;
     void *data = nullptr;
     table->find_dpdk(&key, &data);
@@ -166,20 +167,20 @@ class Metering {
       T data_t = *((T *)data);
       return data_t;
     } else
-#endif
+
       return default_value;
   }
 
   uint64_t Find(MeteringKey *keys, T **vals, int n) {
     uint64_t hit_mask = 0;
-#ifdef debug
+
     const auto &table = table_;
     MeteringKey *key_ptr[n];
     for (int h = 0; h < n; h++)
       key_ptr[h] = &keys[h];
     table->lookup_bulk_data((const void **)&key_ptr, n, &hit_mask,
                             (void **)vals);
-#endif
+
     return hit_mask;
   }
 

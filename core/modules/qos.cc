@@ -35,18 +35,18 @@
 
 typedef enum { FIELD_TYPE = 0, VALUE_TYPE } Type;
 using bess::metadata::Attribute;
-#define metering_test 1
+#define metering_test 0
 static inline int is_valid_gate(gate_idx_t gate) {
   return (gate < MAX_GATES || gate == DROP_GATE);
 }
 
 const Commands Qos::cmds = {
     {"add", "QosCommandAddArg", MODULE_CMD_FUNC(&Qos::CommandAdd),
-     Command::THREAD_UNSAFE},
+     Command::THREAD_SAFE},
     {"delete", "QosCommandDeleteArg", MODULE_CMD_FUNC(&Qos::CommandDelete),
-     Command::THREAD_UNSAFE},
+     Command::THREAD_SAFE},
     {"clear", "EmptyArg", MODULE_CMD_FUNC(&Qos::CommandClear),
-     Command::THREAD_UNSAFE},
+     Command::THREAD_SAFE},
     {"set_default_gate", "QosCommandSetDefaultGateArg",
      MODULE_CMD_FUNC(&Qos::CommandSetDefaultGate), Command::THREAD_SAFE}};
 
@@ -113,9 +113,17 @@ for (int i = 0; i < arg.values_size(); i++) {
   default_gate_ = DROP_GATE;
   total_key_size_ = align_ceil(size_acc, sizeof(uint64_t));
   total_value_size_ = align_ceil(value_acc, sizeof(uint64_t));
+   // std::cout<<"size_acc="<<size_acc<<"total="<<total_key_size_<<std::endl;
 
+    uint8_t* cs = (uint8_t*)&mask;
+    for (int i = 0; i < size_acc; i++)
+    {
+        cs[i] = 0xff;       
+    }
+  //  std::cout <<"bo="<<static_cast<unsigned>(cs[0])<<"b1="<<static_cast<unsigned>(cs[1])<<"b2="<<static_cast<unsigned>(cs[2])<<"b3="<<static_cast<unsigned>(cs[3])<<"b4="<<static_cast<unsigned>(cs[4])<<"b5="<<static_cast<unsigned>(cs[5])<<"b6="<<static_cast<unsigned>(cs[6])<<"b7="<<static_cast<unsigned>(cs[7])<<std::endl;
+ // std::cout <<"mask0="<<mask[0]<<";1="<<mask[1]<<";2="<<mask[2]<<";3="<<mask[3]<<";4="<<mask[4]<<";5="<<mask[5]<<";6="<<mask[6]<<";7="<<mask[7]<<std::endl;
   table_.Init(total_key_size_);
-#ifdef metering_test
+#ifdef oometering_test
   struct rte_meter_srtcm_params app_srtcm_params = {
       .cir = 1000000 * 46, .cbs = 2048, .ebs = 2048};
   int ret = rte_meter_srtcm_profile_config(&p, &app_srtcm_params);
@@ -130,23 +138,103 @@ for (int i = 0; i < arg.values_size(); i++) {
 }
 
 void Qos::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
-  gate_idx_t default_gate;
+   gate_idx_t default_gate;
+   MeteringKey keys[bess::PacketBatch::kMaxBurst] __ymm_aligned;
+   
+
+  int cnt = batch->cnt(); //std::cout<<"cnt="<<cnt<<std::endl;
+//  gate_idx_t Outgate[cnt];
+struct QosData *data[cnt];
+
+  // Initialize the padding with zero
+  for (int i = 0; i < cnt; i++) {
+    keys[i].u64_arr[0] = keys[i].u64_arr[1] = keys[i].u64_arr[2] = keys[i].u64_arr[3] = keys[i].u64_arr[4] = keys[i].u64_arr[5] = keys[i].u64_arr[6] = keys[i].u64_arr[7] =0;
+  }
+  //std::cout<<"before="<<cnt<<std::endl;
   default_gate = ACCESS_ONCE(default_gate_);
-  int cnt = batch->cnt();
+  for (const auto &field : fields_) {
+  //  std::cout<<"after="<<cnt<<std::endl;
+    int offset;
+    int pos = field.pos;
+    int attr_id = field.attr_id;
+
+    if (attr_id < 0) {
+      offset = field.offset;
+    } else {
+      offset = bess::Packet::mt_offset_to_databuf_offset(attr_offset(attr_id));
+    }
+
+    for (int j = 0; j < cnt; j++) {
+      char *buf_addr = batch->pkts()[j]->buffer<char *>();
+
+      /* for offset-based attrs we use relative offset */
+      if (attr_id < 0) {
+        buf_addr += batch->pkts()[j]->data_off();
+      }
+
+      char *key = reinterpret_cast<char *>(keys[j].u64_arr) + pos;
+
+      *(reinterpret_cast<uint64_t *>(key)) =
+          *(reinterpret_cast<uint64_t *>(buf_addr + offset));
+
+         size_t len = reinterpret_cast<size_t> (total_key_size_/sizeof(uint64_t));
+    //      std::cout<<"qer-key before mask="<<keys[j].u64_arr[0] << " ;1="<<keys[j].u64_arr[1] << " ;2="<<keys[j].u64_arr[2] <<" ;3=" <<keys[j].u64_arr[3] <<" ;4="<< keys[j].u64_arr[4] <<" ;5=" <<keys[j].u64_arr[5] <<" ;6=" <<keys[j].u64_arr[6] << " ;7="<<keys[j].u64_arr[7]<<std::endl;
+         for(size_t i=0;i<len;i++)
+          {
+            keys[j].u64_arr[i]=keys[j].u64_arr[i] & mask[i];
+          }
+    }
+  }
+
+  uint64_t hit_mask = table_.Find(keys, data, cnt);
+  std::cout<<"hitmask="<<hit_mask<<std::endl;
+
+  for (int i = 0; i < cnt; i++) {
+    std::cout<<"LOOKUP-QER_KEY[0]="<<keys[i].u64_arr[0] << " ;1="<<keys[i].u64_arr[1] << " ;2="<<keys[i].u64_arr[2] <<" ;3=" <<keys[i].u64_arr[3] <<" ;4="<< keys[i].u64_arr[4] <<" ;5=" <<keys[i].u64_arr[5] <<" ;6=" <<keys[i].u64_arr[6] << " ;7="<<keys[i].u64_arr[7]<<std::endl;
+     std::cout <<"EXTRACTED DATA FROM HASH="<<"qfi="<< static_cast<unsigned>(data[i]->qfi)<<"; ulstatus="<< static_cast<unsigned>(data[i]->ulStatus)<<"; dlstatus="<< static_cast<unsigned>(data[i]->dlStatus)<<"; cir="<< data[i]->cir <<"; pir="<< data[i]->pir<<"; cbs="<<data[i]->cbs << "; ebs="<<data[i]->ebs<<"; pbs="<< data[i]->pbs<<"; ulMbr="<< data[i]->ulMbr<<"; dlMbr="<<data[i]->dlMbr<<"; ulGbr="<< data[i]->ulGbr<<"; dlGbr="<< data[i]->dlGbr<<std::endl;
+  }
+  
+//////////////////////////
+  struct rte_meter_srtcm m;
+  struct rte_meter_srtcm_profile p;
+
+ // gate_idx_t default_gate;
+  default_gate = ACCESS_ONCE(default_gate_);
+ // int cnt = batch->cnt();
  // std::cout<<"ProcessBatch called"<<std::endl;
   for (int j = 0; j < cnt; j++) {
-#ifdef metering_test
+     
+     if ((hit_mask & (1ULL << j)) == 0) {
+        EmitPacket(ctx, batch->pkts()[j], default_gate);
+        continue;
+      }
+
+    struct rte_meter_srtcm_params app_srtcm_params = {
+      .cir = data[j]->cir , .cbs = data[j]->cbs, .ebs = data[j]->ebs};
+
+  std::cout <<"cir="<< data[j]->cir <<"cbs="<<data[j]->cbs << "ebs="<<data[j]->ebs<<std::endl;
+
+  int ret = rte_meter_srtcm_profile_config(&p, &app_srtcm_params);
+  if (ret)
+    std::cout<< "rte_meter_srtcm_profile_config failed"<<std::endl;  //return CommandFailure(ret, "rte_meter_srtcm_profile_config failed");
+      
+  ret = rte_meter_srtcm_config(&m,&p);
+  if (ret) 
+    std::cout<< "rte_meter_srtcm_config failed"<<std::endl; //return CommandFailure(ret, "rte_meter_srtcm_config failed");
+//#ifdef metering_test
     uint64_t time = rte_rdtsc();
     uint8_t color = rte_meter_srtcm_color_blind_check(
         &m, &p, time, batch->pkts()[j]->total_len());
+
     if (color != RTE_COLOR_GREEN)
       EmitPacket(ctx, batch->pkts()[j], default_gate);
     else {
       EmitPacket(ctx, batch->pkts()[j], 0);
     }
-#else
-    EmitPacket(ctx, batch->pkts()[j], default_gate);
-#endif    
+
+//#else
+  //  EmitPacket(ctx, batch->pkts()[j], default_gate);
+//#endif    
   }
 }
 int Qos::GetEntryCount() {
@@ -177,7 +265,7 @@ CommandResponse Qos::ExtractKey(const T &arg, MeteringKey *key) {
     int field_pos = fields_[i].pos;
 
     uint64_t v = 0;
-    //uint64_t m = 0;
+    uint64_t m = 0;
 
   /*  bess::pb::FieldData valuedata = arg.values(i);
     if (valuedata.encoding_case() == bess::pb::FieldData::kValueInt) {
@@ -283,7 +371,6 @@ CommandResponse Qos::ExtractKeyMask(const T &arg, MeteringKey *key,
                         valuedata.value_bin().size());
     }
 
-    
       
     memcpy(reinterpret_cast<uint8_t *>(val) + val_pos, &v, val_size);
     
@@ -298,14 +385,15 @@ CommandResponse Qos::CommandAdd(const bess::pb::QosCommandAddArg &arg) {
   // table_.Add(const T &val, const MeteringKey &key)
 gate_idx_t gate = arg.gate();
   std::cout<<"CommandAdd"<<std::endl;
-  MeteringKey key ;
+  MeteringKey key={{0}} ;
  
 
   struct QosData data;
   data.ogate = gate;
     CommandResponse err =ExtractKeyMask(arg, &key,&data);
     
-   if (err.error().code() != 0) {
+    std::cout <<"COMMAND-ADD-INSERT qfi="<< static_cast<unsigned>(data.qfi)<<"; ulstatus="<< static_cast<unsigned>(data.ulStatus)<<"; dlstatus="<< static_cast<unsigned>(data.dlStatus)<<"; cir="<< data.cir <<"; pir="<< data.pir<<"; cbs="<<data.cbs << "; ebs="<<data.ebs<<"; pbs="<< data.pbs<<"; ulMbr="<< data.ulMbr<<"; dlMbr="<< data.dlMbr<<"; ulGbr="<< data.ulGbr<<"; dlGbr="<< data.dlGbr<<std::endl;
+    if (err.error().code() != 0) {
     return err;
   }
 
@@ -314,7 +402,7 @@ gate_idx_t gate = arg.gate();
   }
 
   //data.priority = priority;
-  data.ogate = gate;
+ // data.ogate = gate;
   table_.Add(data, key);
   return CommandSuccess();
 }

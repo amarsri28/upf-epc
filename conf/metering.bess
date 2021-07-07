@@ -28,39 +28,24 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-import scapy.all as scapy
-import socket
 
-def aton(ip):
-    return socket.inet_aton(ip)
 
-# Craft a packet with the specified IP addresses
-def gen_packet(proto, src_ip, dst_ip):
-    eth = scapy.Ether(src='02:1e:67:9f:4d:ae', dst='06:16:3e:1b:72:32')
-    ip = scapy.IP(src=src_ip, dst=dst_ip)
-    udp = proto(sport=10001, dport=10002)
-    payload = 'helloworld'
-    pkt = eth/ip/udp/payload
-    return bytes(pkt)
 
-packets = [gen_packet(scapy.UDP, '172.16.100.1', '10.0.0.1'),
-           gen_packet(scapy.UDP, '172.12.55.99', '12.34.56.78'),
-           gen_packet(scapy.UDP, '172.12.55.99', '10.0.0.1'),
-           gen_packet(scapy.UDP, '172.16.100.1', '12.34.56.78'),
-           gen_packet(scapy.UDP, '172.12.55.99', '12.34.56.78'),
-           gen_packet(scapy.UDP, '192.168.1.123', '12.34.56.78'),
-          ]
-# cir = 46*1000000 ; cbs =2048; ebs =2048; with packet size 46 in code
-# L4 protocol and source/destination IP addresses
-Metering::Qos(fields=[{'offset':26, 'num_bytes':4},{'offset':30, 'num_bytes':8}],values=[{'offset':26, 'num_bytes':1},{'offset':27, 'num_bytes':1},{'offset':28, 'num_bytes':1},{'offset':29, 'num_bytes':4},{'offset':33, 'num_bytes':4},{'offset':37, 'num_bytes':4},{'offset':41, 'num_bytes':4},{'offset':45, 'num_bytes':4},{'offset':49, 'num_bytes':4},{'offset':53, 'num_bytes':4},{'offset':57, 'num_bytes':4},{'offset':57, 'num_bytes':4}])
+Metering::Qos(fields=[{'attr_name':'inport', 'num_bytes':4},{'attr_name':'outport', 'num_bytes':8}], values=[{'offset':26, 'num_bytes':1},{'offset':27, 'num_bytes':1},{'offset':28, 'num_bytes':1},{'offset':29, 'num_bytes':4},{'offset':33, 'num_bytes':4},{'offset':37, 'num_bytes':4},{'offset':41, 'num_bytes':4},{'offset':45, 'num_bytes':4},{'offset':49, 'num_bytes':4},{'offset':53, 'num_bytes':4},{'offset':57, 'num_bytes':4},{'offset':57, 'num_bytes':4}])
 
-Source() -> Rewrite(templates=packets) -> Metering
+Source() -> SetMetadata(attrs=[{'name': 'inport', 'size': 4, 'value_int': 6}, {'name': 'outport', 'size':8, 'value_int':5}]) -> Metering
 
-Metering:0 -> Sink()
+#Metering:0 -> S::Split(size=2, attribute='val1')
+Metering:0 -> Sink() 
 Metering:1 -> Sink()   # used as default gate
+#S:0 -> Sink()
+#S:1 -> Sink()
+#S:2 -> Sink()
+#Metering.add(fields=[{'value_int':0x6}, {'value_int':0x5}], gate=0,values=[{'value_int':2},{'value_int':1}])
 
-Metering.add(fields=[{'value_int':0x6}, {'value_int':0x5}], gate=0,values=[{'value_int':0},{'value_int':1},{'value_int':2},{'value_int':3},{'value_int':4},{'value_int':5},{'value_int':6},{'value_int':7},{'value_int':8},{'value_int':9},{'value_int':9},{'value_int':8}])
-Metering.add(fields=[{'value_int':0x61}, {'value_int':0x5}], gate=0,values=[{'value_int':0},{'value_int':1},{'value_int':2},{'value_int':3},{'value_int':4},{'value_int':5},{'value_int':6},{'value_int':7},{'value_int':8},{'value_int':9},{'value_int':9},{'value_int':8}])
+
+
+Metering.add(fields=[{'value_int':0x6}, {'value_int':0x5}], gate=0,values=[{'value_int':10},{'value_int':20},{'value_int':30},{'value_int':40},{'value_int':50},{'value_int':60},{'value_int':70},{'value_int':80},{'value_int':90},{'value_int':100},{'value_int':110},{'value_int':120}])
 #Metering.add(fields=[{'value_bin':aton('172.12.55.99')}, {'value_bin':aton('12.34.56.78')}], gate=0,values=[{'value_bin':aton('172.16.100.1')}, {'value_bin':aton('10.0.0.1')}])
 
 #Metering.add(fields=[{'value_bin':aton('172.12.55.99')}, {'value_bin':aton('12.34.56.78')}], gate=0,values=[{'value_bin':aton('172.16.100.1')}, {'value_bin':aton('10.0.0.1')}])

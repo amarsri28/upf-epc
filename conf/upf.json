@@ -2,7 +2,7 @@
     "": "Vdev or sim support. Enable `\"mode\": \"af_xdp\"` to enable AF_XDP mode, or `\"mode\": \"af_packet\"` to enable AF_PACKET mode, or `\"mode\": \"sim\"` to generate synthetic traffic from BESS's Source module",
     "": "mode: af_xdp",
     "": "mode: af_packet",
-    "": "mode: sim",
+    "mode": "sim",
 
     "": "max UE sessions",
     "max_sessions": 50000,

@@ -72,6 +72,8 @@ struct QosData {
   gate_idx_t ogate;
 }__attribute__((packed));
 
+//__uint64_t mask[8]={0xffffffffffffffff,0x00ffffffffffffff,0x0000ffffffffffff,0x000000ffffffffff,0x00000000ffffffff,0x0000000000ffffff,0x000000000000ffff,0x00000000000000ff,0x0000000000000000};
+
 class Qos final : public Module {
  public:
   static const gate_idx_t kNumOGates = MAX_GATES;
@@ -79,7 +81,10 @@ class Qos final : public Module {
   static const Commands cmds;
 
   Qos() : Module(), default_gate_(), total_key_size_(), fields_() {
-    max_allowed_workers_ = Worker::kMaxWorkers;
+    max_allowed_workers_ = Worker::kMaxWorkers; 
+    size_t len = sizeof(mask)/sizeof(uint64_t);
+    for(size_t i=0;i < len;i++)
+         mask[i]=0;
   }
 
   CommandResponse Init(const bess::pb::QosArg &arg);
@@ -94,8 +99,8 @@ CommandResponse ExtractKeyMask(const T &arg, MeteringKey *key,
                                               QosData *val) ;
                                               template <typename T>
 CommandResponse ExtractKey(const T &arg, MeteringKey *key) ;
-  struct rte_meter_srtcm m;
-  struct rte_meter_srtcm_profile p;
+  //struct rte_meter_srtcm m;
+  //struct rte_meter_srtcm_profile p;
 
  private:
   gate_idx_t LookupEntry(const MeteringKey &key, gate_idx_t def_gate);
@@ -113,6 +118,7 @@ CommandResponse ExtractKey(const T &arg, MeteringKey *key) ;
   std::vector<struct MeteringField> fields_;
   std::vector<struct MeteringField> values_;
   Metering<QosData> table_;
+  uint64_t mask[8];
 };
 
 #endif  // BESS_MODULES_QOS_H
