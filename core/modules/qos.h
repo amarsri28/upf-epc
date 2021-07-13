@@ -51,6 +51,8 @@ static_assert(MAX_FIELD_SIZE <= sizeof(uint64_t),
 #if __BYTE_ORDER__ != __ORDER_LITTLE_ENDIAN__
 #error this code assumes little endian architecture (x86)
 #endif
+
+enum { FieldType = 0, ValueType };
 /*
 struct QosKey {
   uint64_t u64_arr[MAX_FIELDS];
@@ -69,7 +71,14 @@ struct QosData {
   uint32_t dlMbr;
   uint32_t ulGbr;
   uint32_t dlGbr;
+  void *p;
+  void *m;
   gate_idx_t ogate;
+}__attribute__((packed));
+
+struct MKey {
+  uint8_t key1;
+  uint8_t key2;
 }__attribute__((packed));
 
 //__uint64_t mask[8]={0xffffffffffffffff,0x00ffffffffffffff,0x0000ffffffffffff,0x000000ffffffffff,0x00000000ffffffff,0x0000000000ffffff,0x000000000000ffff,0x00000000000000ff,0x0000000000000000};
@@ -96,16 +105,17 @@ class Qos final : public Module {
       const bess::pb::QosCommandSetDefaultGateArg &arg);
         template <typename T>
 CommandResponse ExtractKeyMask(const T &arg, MeteringKey *key,
-                                              QosData *val) ;
+                                              QosData *val,MKey *l) ;
                                               template <typename T>
 CommandResponse ExtractKey(const T &arg, MeteringKey *key) ;
-  //struct rte_meter_srtcm m;
-  //struct rte_meter_srtcm_profile p;
-
- private:
+  struct rte_meter_srtcm m1;
+  struct rte_meter_srtcm_profile p1;
+CommandResponse AddFieldOne(const bess::pb::Field &field,struct MeteringField *f, uint8_t type);
   gate_idx_t LookupEntry(const MeteringKey &key, gate_idx_t def_gate);
-  CommandResponse AddFieldOne(const bess::pb::Field &field,
-                              struct MeteringField *f);
+ private:
+
+
+
   //template <typename T>
   //CommandResponse ExtractKey(const T &arg, MeteringKey *key);
 

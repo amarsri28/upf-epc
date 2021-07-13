@@ -1,0 +1,64 @@
+# Copyright (c) 2014-2016, The Regents of the University of California.
+# Copyright (c) 2016-2017, Nefeli Networks, Inc.
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+# * Redistributions of source code must retain the above copyright notice, this
+# list of conditions and the following disclaimer.
+#
+# * Redistributions in binary form must reproduce the above copyright notice,
+# this list of conditions and the following disclaimer in the documentation
+# and/or other materials provided with the distribution.
+#
+# * Neither the names of the copyright holders nor the names of their
+# contributors may be used to endorse or promote products derived from this
+# software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+# ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+# LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+# CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+# SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+# INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+# CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+# ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+# POSSIBILITY OF SUCH DAMAGE.
+import scapy.all as scapy
+import socket
+import struct
+
+
+
+Metering::Qos(fields=[{'attr_name':'inport', 'num_bytes':4},{'attr_name':'outport', 'num_bytes':8}], values=[{'attr_name':'qfi', 'num_bytes':4},{'attr_name':'val', 'num_bytes':8}])
+wm::WildcardMatch(fields=[{'attr_name':'qfi', 'num_bytes':4},{'attr_name':'val', 'num_bytes':8}], values=[{'attr_name':'inport', 'num_bytes':4},{'attr_name':'outport', 'num_bytes':8}])
+
+
+
+
+Source() -> SetMetadata(attrs=[{'name': 'inport', 'size': 4, 'value_int': 6},{'name': 'outport', 'size': 8, 'value_int': 5}]) -> Metering
+#Source() -> SetMetadata(attrs=[{'name': 'inport', 'size': 4, 'value_int': 6},{'name': 'outport', 'size': 8, 'value_int': 5}]) -> Rewrite(templates=pkts) -> Metering
+#Source() -> SetMetadata(attrs=[{'name': 'key', 'size': 1, 'value_int': 6}, {'name': 'key1', 'size':1, 'value_int':5}]) -> Metering
+
+
+wm:1 ->Sink()
+wm:0 ->Sink()
+
+Metering:0 -> wm
+Metering:1 -> Sink()   # used as default gate
+
+
+
+
+wm.add(values=[{'value_int':0x1}, {'value_int':0x2}], gate=0,
+        masks=[{'value_int':0xffffffff}, {'value_int':0xffffffffffffffff}], priority=3,valuesv =[{'value_int':0x6},{'value_int':0x5}])
+        
+Metering.add(fields=[{'value_int':0x6}, {'value_int':0x5}], gate=0,values=[{'value_int':0x1},{'value_int':0x2}])
+#encap.add(fields=[{'value_int':0x1}, {'value_int':0x2}], gate=0,values=[{'value_int':21},{'value_int':11}])
+
+wm.set_default_gate(gate=1)
+Metering.set_default_gate(gate=1)
+#encap.set_default_gate(gate=1)

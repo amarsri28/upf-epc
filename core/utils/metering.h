@@ -74,6 +74,8 @@ struct MeteringKey {
   uint64_t u64_arr[MAX_FIELDS];
 }__attribute__((packed));
 
+
+
 // Equality operator for two MeteringKeys
 class MeteringKeyEq {
  public:
