@@ -28,32 +28,12 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-
-
-
-Metering::Qos(fields=[{'attr_name':'inport', 'num_bytes':4},{'attr_name':'outport', 'num_bytes':8}], values=[{'offset':26, 'num_bytes':1},{'offset':27, 'num_bytes':1},{'offset':28, 'num_bytes':1},{'offset':29, 'num_bytes':4},{'offset':33, 'num_bytes':4},{'offset':37, 'num_bytes':4},{'offset':41, 'num_bytes':4},{'offset':45, 'num_bytes':4},{'offset':49, 'num_bytes':4},{'offset':53, 'num_bytes':4},{'offset':57, 'num_bytes':4},{'offset':57, 'num_bytes':4}])
+Metering::Qos(fields=[{'attr_name':'inport', 'num_bytes':4},{'attr_name':'outport', 'num_bytes':8}], values=[{'offset':28, 'num_bytes':1},{'offset':29, 'num_bytes':4},{'offset':33, 'num_bytes':4},{'offset':37, 'num_bytes':4},{'offset':41, 'num_bytes':4},{'offset':45, 'num_bytes':4}])
 
 Source() -> SetMetadata(attrs=[{'name': 'inport', 'size': 4, 'value_int': 6}, {'name': 'outport', 'size':8, 'value_int':5}]) -> Metering
 
-#Metering:0 -> S::Split(size=2, attribute='val1')
 Metering:0 -> Sink() 
 Metering:1 -> Sink()   # used as default gate
-#S:0 -> Sink()
-#S:1 -> Sink()
-#S:2 -> Sink()
-#Metering.add(fields=[{'value_int':0x6}, {'value_int':0x5}], gate=0,values=[{'value_int':2},{'value_int':1}])
 
-
-
-Metering.add(fields=[{'value_int':0x6}, {'value_int':0x5}], gate=0,values=[{'value_int':10},{'value_int':20},{'value_int':30},{'value_int':40},{'value_int':50},{'value_int':60},{'value_int':70},{'value_int':80},{'value_int':90},{'value_int':100},{'value_int':110},{'value_int':120}])
-#Metering.add(fields=[{'value_bin':aton('172.12.55.99')}, {'value_bin':aton('12.34.56.78')}], gate=0,values=[{'value_bin':aton('172.16.100.1')}, {'value_bin':aton('10.0.0.1')}])
-
-#Metering.add(fields=[{'value_bin':aton('172.12.55.99')}, {'value_bin':aton('12.34.56.78')}], gate=0,values=[{'value_bin':aton('172.16.100.1')}, {'value_bin':aton('10.0.0.1')}])
-#Metering.add(fields=[{'value_int':6}, {'value_bin':aton('172.12.55.99')}, {'value_bin':aton('12.34.56.78')}], gate=1)
-#Metering.add(fields=[{'value_int':17}, {'value_bin':aton('172.12.55.99')}, {'value_bin':aton('12.34.56.78')}], gate=2)
-
-# delete test
-#Metering.add(fields=[{'value_bin':b'\x11'}, {'value_bin':aton('192.168.1.123')}, {'value_bin':aton('12.34.56.78')}], gate=3)
-#Metering.delete(fields=[{'value_bin':b'\x11'}, {'value_bin':aton('192.168.1.123')}, {'value_bin':aton('12.34.56.78')}])
-
+Metering.add(fields=[{'value_int':0x6}, {'value_int':0x5}], gate=0,values=[{'value_int':30},{'value_int':46000000},{'value_int':50},{'value_int':2048},{'value_int':2048},{'value_int':80}])
 Metering.set_default_gate(gate=1)

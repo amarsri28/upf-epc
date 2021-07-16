@@ -492,51 +492,35 @@ func (b *bess) sim(u *upf, method string) {
 			fseID: uint64(n3TEID + i),
 
 			qfi:      9,
-			ulStatus: 0,
-			dlStatus: 0,
-			cir:      50000,
+		        cir:      50000,
 			pir:      50000,
 			cbs:      2048,
 			pbs:      2048,
 			ebs:      2048,
-			ulMbr:    50000,
-			dlMbr:    50000,
-			ulGbr:    50000,
-			dlGbr:    50000,
+		
 		}
 
 		qerN6Up := qer{
 			qerID:    n6,
 			fseID:    uint64(n3TEID + i),
 			qfi:      8,
-			ulStatus: 0,
-			dlStatus: 0,
 			cir:      50000,
 			pir:      50000,
 			cbs:      2048,
 			pbs:      2048,
 			ebs:      2048,
-			ulMbr:    50000,
-			dlMbr:    50000,
-			ulGbr:    50000,
-			dlGbr:    50000,
+		
 		}
 
 		qerN9Up := qer{
 			qerID:    n9,
 			fseID:    uint64(n3TEID + i),
 			qfi:      7,
-			ulStatus: 0,
-			dlStatus: 0,
 			cir:      50000,
 			pir:      50000,
 			cbs:      2048,
 			pbs:      2048,
 			ebs:      2048,
-			ulMbr:    50000,
-			dlMbr:    50000,
-			ulGbr:    50000,
-			dlGbr:    50000,
 		}
 
 		qers := []qer{qerDown, qerN6Up, qerN9Up}
@@ -683,17 +667,12 @@ func (b *bess) addQER(ctx context.Context, done chan<- bool, qer qer) {
 			},
 			Values: []*pb.FieldData{
 				intEnc(uint64(qer.qfi)),      /* action */
-				intEnc(uint64(qer.ulStatus)), /* QFI */
-				intEnc(uint64(qer.dlStatus)), /* tunnel_out_type */
 				intEnc(uint64(qer.cir)),      /* committed info rate */
 				intEnc(uint64(qer.pir)),      /* Peak Info rate */
 				intEnc(uint64(qer.cbs)),      /* committed burst size */
 				intEnc(uint64(qer.pbs)),      /* Peak burst size */
 				intEnc(uint64(qer.ebs)),      /* Excess burst size */
-				intEnc(uint64(qer.ulMbr)),    /* access-ip */
-				intEnc(uint64(qer.dlMbr)),    /* enb ip */
-				intEnc(uint64(qer.ulGbr)),    /* enb teid */
-				intEnc(uint64(qer.dlGbr)),    /* udp gtpu port */
+			
 			},
 		}
 		any, err = anypb.New(q)

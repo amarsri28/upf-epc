@@ -72,9 +72,7 @@ using Error = std::pair<int, std::string>;
 
 struct MeteringKey {
   uint64_t u64_arr[MAX_FIELDS];
-}__attribute__((packed));
-
-
+} __attribute__((packed));
 
 // Equality operator for two MeteringKeys
 class MeteringKeyEq {
@@ -139,8 +137,10 @@ class Metering {
     Error err;
     const void *Key_t = (const void *)&key;
     T *val_t = new T(val);
-   // std::cout<<"Metering Key0="<<key.u64_arr[0]<<" 1="<<key.u64_arr[1]<<" 2="<<key.u64_arr[2]<<" 3="<<key.u64_arr[3]<<" 4="<<key.u64_arr[4]<<" 5= "<<key.u64_arr[5]<<" 6="<<key.u64_arr[6]<<" 7="<<key.u64_arr[7]<<std::endl;
-    int t = table_->insert_dpdk(Key_t, val_t); std::cout<<t<<std::endl;
+    int ret = table_->insert_dpdk(Key_t, val_t);
+    if (!ret) {
+      return MakeError(ENOENT, "Dpdk Insert Failed");
+    }
     return MakeError(0);
   }
 
@@ -151,7 +151,6 @@ class Metering {
     if (!ret) {
       return MakeError(ENOENT, "rule doesn't exist");
     }
-
     return MakeError(0);
   }
 
@@ -161,7 +160,6 @@ class Metering {
   // Find an entry in the table.
   // Returns the value if `key` matches a rule, otherwise `default_value`.
   T Find(const MeteringKey &key, const T &default_value) const {
-
     const auto &table = table_;
     void *data = nullptr;
     table->find_dpdk(&key, &data);

@@ -60,28 +60,20 @@ struct QosKey {
 */
 struct QosData {
   uint8_t qfi;
-  uint8_t ulStatus;
-  uint8_t dlStatus;
   uint32_t cir;
   uint32_t pir;
   uint32_t cbs;
-  uint32_t ebs;
   uint32_t pbs;
-  uint32_t ulMbr;
-  uint32_t dlMbr;
-  uint32_t ulGbr;
-  uint32_t dlGbr;
-  void *p;
-  void *m;
+  uint32_t ebs;
   gate_idx_t ogate;
-}__attribute__((packed));
+  struct rte_meter_srtcm_profile p;
+  struct rte_meter_srtcm m;
+} __attribute__((packed));
 
 struct MKey {
   uint8_t key1;
   uint8_t key2;
-}__attribute__((packed));
-
-//__uint64_t mask[8]={0xffffffffffffffff,0x00ffffffffffffff,0x0000ffffffffffff,0x000000ffffffffff,0x00000000ffffffff,0x0000000000ffffff,0x000000000000ffff,0x00000000000000ff,0x0000000000000000};
+} __attribute__((packed));
 
 class Qos final : public Module {
  public:
@@ -90,10 +82,10 @@ class Qos final : public Module {
   static const Commands cmds;
 
   Qos() : Module(), default_gate_(), total_key_size_(), fields_() {
-    max_allowed_workers_ = Worker::kMaxWorkers; 
-    size_t len = sizeof(mask)/sizeof(uint64_t);
-    for(size_t i=0;i < len;i++)
-         mask[i]=0;
+    max_allowed_workers_ = Worker::kMaxWorkers;
+    size_t len = sizeof(mask) / sizeof(uint64_t);
+    for (size_t i = 0; i < len; i++)
+      mask[i] = 0;
   }
 
   CommandResponse Init(const bess::pb::QosArg &arg);
@@ -103,22 +95,16 @@ class Qos final : public Module {
   CommandResponse CommandClear(const bess::pb::EmptyArg &arg);
   CommandResponse CommandSetDefaultGate(
       const bess::pb::QosCommandSetDefaultGateArg &arg);
-        template <typename T>
-CommandResponse ExtractKeyMask(const T &arg, MeteringKey *key,
-                                              QosData *val,MKey *l) ;
-                                              template <typename T>
-CommandResponse ExtractKey(const T &arg, MeteringKey *key) ;
-  struct rte_meter_srtcm m1;
-  struct rte_meter_srtcm_profile p1;
-CommandResponse AddFieldOne(const bess::pb::Field &field,struct MeteringField *f, uint8_t type);
+  template <typename T>
+  CommandResponse ExtractKeyMask(const T &arg, MeteringKey *key, QosData *val,
+                                 MKey *l);
+  template <typename T>
+  CommandResponse ExtractKey(const T &arg, MeteringKey *key);
+  CommandResponse AddFieldOne(const bess::pb::Field &field,
+                              struct MeteringField *f, uint8_t type);
   gate_idx_t LookupEntry(const MeteringKey &key, gate_idx_t def_gate);
+
  private:
-
-
-
-  //template <typename T>
-  //CommandResponse ExtractKey(const T &arg, MeteringKey *key);
-
   int DelEntry(MeteringKey *key);
   int GetEntryCount();
   void Clear();
